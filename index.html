@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Convertisseur MIDI → .dumb binaire</title>
+  <title>MIDI → .dumb Binary Converter</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
     label { display: block; margin: .5em 0; }
@@ -12,21 +12,21 @@
 </head>
 <body>
 
-  <h1>Convertisseur MIDI → .dumb binaire</h1>
+  <h1>MIDI → .dumb Binary Converter</h1>
 
   <label>MIDI File  
     <input type="file" id="midiInput" accept=".mid,.midi" />
   </label>
 
-  <label>Note min (MIDI number)  
+  <label>Minimum Note (MIDI number)  
     <input type="number" id="noteMin" value="56" min="0" max="127" />
   </label>
 
-  <label>Note max (MIDI number)  
+  <label>Maximum Note (MIDI number)  
     <input type="number" id="noteMax" value="92" min="0" max="127" />
   </label>
 
-  <label>Subdivisions par mesure  
+  <label>Subdivisions per Measure  
     <input type="number" id="subdivisions" value="24" min="1" />
   </label>
 
@@ -34,17 +34,16 @@
     <input type="number" id="bpm" value="180" min="1" />
   </label>
 
-  <label>Beats par mesure  
+  <label>Beats per Measure  
     <input type="number" id="beats" value="4" min="1" />
   </label>
 
-  <button id="convertBtn">Convertir en .dumb</button>
-  <button id="downloadBtn" disabled>Télécharger .dumb</button>
+  <button id="convertBtn">Convert to .dumb</button>
+  <button id="downloadBtn" disabled>Download .dumb</button>
 
   <h2>Log</h2>
   <pre id="log"></pre>
 
-  <!-- On importe la lib correctement pour qu'elle expose `Midi` dans le navigateur -->
   <script src="https://unpkg.com/@tonejs/midi"></script>
   <script>
     const midiInput      = document.getElementById('midiInput');
@@ -70,7 +69,7 @@
       downloadBtn.disabled = true;
 
       if (!midiInput.files.length) {
-        alert('Merci de choisir un fichier MIDI.');
+        alert('Please select a MIDI file.');
         return;
       }
 
@@ -81,7 +80,7 @@
       const beatsPerMeasure= parseInt(beatsInput.value);
 
       if ([noteMin,noteMax,subdivisions,bpm,beatsPerMeasure].some(isNaN)) {
-        alert('Paramètres invalides.');
+        alert('Invalid parameters.');
         return;
       }
 
@@ -93,10 +92,10 @@
       const measureSec = beatSec * beatsPerMeasure;
       const stepSec    = measureSec / subdivisions;
 
-      log(`Paramètres : notes ${noteMin}→${noteMax} (${NOTE_COUNT}), subdivisions ${subdivisions}, BPM ${bpm}, beats/measure ${beatsPerMeasure}`);
-      log(`Durée d’une subdivision : ${stepSec.toFixed(4)} s`);
+      log(`Settings: notes ${noteMin}→${noteMax} (${NOTE_COUNT}), subdivisions ${subdivisions}, BPM ${bpm}, beats/measure ${beatsPerMeasure}`);
+      log(`Subdivision duration: ${stepSec.toFixed(4)} s`);
 
-      // Lecture du fichier MIDI
+      // Read the MIDI file
       const file   = midiInput.files[0];
       const buffer = await file.arrayBuffer();
 
@@ -104,16 +103,16 @@
       try {
         midi = new window.Midi(buffer);
       } catch(err) {
-        alert('Erreur de parsing MIDI : ' + err.message);
+        alert('MIDI parsing error: ' + err.message);
         return;
       }
 
       const totalTime = midi.duration;
       const steps     = Math.ceil(totalTime / stepSec);
 
-      log(`Durée du MIDI : ${totalTime.toFixed(3)} s → ${steps} subdivisions`);
+      log(`MIDI duration: ${totalTime.toFixed(3)} s → ${steps} subdivisions`);
 
-      // Construction de la timeline
+      // Build timeline
       const timeline = Array.from({length: steps}, () => new Set());
       const events   = [];
 
@@ -137,7 +136,7 @@
         timeline[s] = new Set(currentNotes);
       }
 
-      // Générer le tableau binaire
+      // Generate binary array
       const bytes = [];
       for (let s = 0; s < steps; s++) {
         let bitAcc = 0, count = 0;
@@ -153,7 +152,7 @@
       }
       binaryData = new Uint8Array(bytes);
 
-      log(`Fichier .dumb généré : ${binaryData.length} octets`);
+      log(`.dumb file generated: ${binaryData.length} bytes`);
       downloadBtn.disabled = false;
     });
 
