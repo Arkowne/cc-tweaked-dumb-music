@@ -1,9 +1,4 @@
-Voici ton **README.md** prêt à être exporté.
-Copie ce contenu et enregistre-le dans un fichier nommé `README.md` :
 
----
-
-````markdown
 # 🎵 ComputerCraft MIDI Player via Redstone Relay
 
 A small project to play `.mid` songs converted into `.dumb` files through `redstone_relay` devices on a **ComputerCraft** computer.
