@@ -66,7 +66,7 @@ Use the web converter at [https://arkowne.github.io/cc-tweaked-dumb-music](https
 Or use the provided Python script in this repository to convert a MIDI file into `.dumb` (do `pip install mido` before):
 
 ```bash
-python3 mid2dumb.py
+python3 convert.py input.mid output.dumb tempo
 ```
 
 Customize the parameters in `convert.py` (BPM, subdivisions, note min/max, etc.).
