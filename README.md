@@ -68,7 +68,7 @@ This will make the program start from `redstone_relay_37` rather than `redstone_
 
 Use the web converter at [https://arkowne.github.io/cc-tweaked-dumb-music](https://arkowne.github.io/cc-tweaked-dumb-music).
 
-Or use the provided Python script in this repository to convert a MIDI file into `.dumb`:
+Or use the provided Python script in this repository to convert a MIDI file into `.dumb` (do `pip install mido` before):
 
 ```bash
 python3 mid2dumb.py
