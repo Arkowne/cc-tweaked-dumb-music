@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Convertisseur MIDI → .dumb binaire</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    label { display: block; margin: .5em 0; }
+    button { margin-top: 1em; }
+    pre { background: #f7f7f7; padding: 10px; max-height: 200px; overflow: auto; }
+  </style>
+</head>
+<body>
+
+  <h1>Convertisseur MIDI → .dumb binaire</h1>
+
+  <label>MIDI File  
+    <input type="file" id="midiInput" accept=".mid,.midi" />
+  </label>
+
+  <label>Note min (MIDI number)  
+    <input type="number" id="noteMin" value="56" min="0" max="127" />
+  </label>
+
+  <label>Note max (MIDI number)  
+    <input type="number" id="noteMax" value="92" min="0" max="127" />
+  </label>
+
+  <label>Subdivisions par mesure  
+    <input type="number" id="subdivisions" value="24" min="1" />
+  </label>
+
+  <label>BPM  
+    <input type="number" id="bpm" value="180" min="1" />
+  </label>
+
+  <label>Beats par mesure  
+    <input type="number" id="beats" value="4" min="1" />
+  </label>
+
+  <button id="convertBtn">Convertir en .dumb</button>
+  <button id="downloadBtn" disabled>Télécharger .dumb</button>
+
+  <h2>Log</h2>
+  <pre id="log"></pre>
+
+  <!-- On importe la lib correctement pour qu'elle expose `Midi` dans le navigateur -->
+  <script src="https://unpkg.com/@tonejs/midi"></script>
+  <script>
+    const midiInput      = document.getElementById('midiInput');
+    const noteMinInput   = document.getElementById('noteMin');
+    const noteMaxInput   = document.getElementById('noteMax');
+    const subdivInput    = document.getElementById('subdivisions');
+    const bpmInput       = document.getElementById('bpm');
+    const beatsInput     = document.getElementById('beats');
+    const convertBtn     = document.getElementById('convertBtn');
+    const downloadBtn    = document.getElementById('downloadBtn');
+    const logPre         = document.getElementById('log');
+
+    let binaryData = null;
+
+    function log(msg) {
+      logPre.textContent += msg + "\n";
+      logPre.scrollTop = logPre.scrollHeight;
+    }
+
+    convertBtn.addEventListener('click', async () => {
+      logPre.textContent = '';
+      binaryData = null;
+      downloadBtn.disabled = true;
+
+      if (!midiInput.files.length) {
+        alert('Merci de choisir un fichier MIDI.');
+        return;
+      }
+
+      const noteMin        = parseInt(noteMinInput.value);
+      const noteMax        = parseInt(noteMaxInput.value);
+      const subdivisions   = parseInt(subdivInput.value);
+      const bpm            = parseInt(bpmInput.value);
+      const beatsPerMeasure= parseInt(beatsInput.value);
+
+      if ([noteMin,noteMax,subdivisions,bpm,beatsPerMeasure].some(isNaN)) {
+        alert('Paramètres invalides.');
+        return;
+      }
+
+      const NOTES = [];
+      for (let n = noteMin; n <= noteMax; n++) NOTES.push(n);
+      const NOTE_COUNT = NOTES.length;
+
+      const beatSec    = 60 / bpm;
+      const measureSec = beatSec * beatsPerMeasure;
+      const stepSec    = measureSec / subdivisions;
+
+      log(`Paramètres : notes ${noteMin}→${noteMax} (${NOTE_COUNT}), subdivisions ${subdivisions}, BPM ${bpm}, beats/measure ${beatsPerMeasure}`);
+      log(`Durée d’une subdivision : ${stepSec.toFixed(4)} s`);
+
+      // Lecture du fichier MIDI
+      const file   = midiInput.files[0];
+      const buffer = await file.arrayBuffer();
+
+      let midi;
+      try {
+        midi = new window.Midi(buffer);
+      } catch(err) {
+        alert('Erreur de parsing MIDI : ' + err.message);
+        return;
+      }
+
+      const totalTime = midi.duration;
+      const steps     = Math.ceil(totalTime / stepSec);
+
+      log(`Durée du MIDI : ${totalTime.toFixed(3)} s → ${steps} subdivisions`);
+
+      // Construction de la timeline
+      const timeline = Array.from({length: steps}, () => new Set());
+      const events   = [];
+
+      midi.tracks.forEach(track => {
+        track.notes.forEach(n => {
+          events.push({ time: n.time,           type: 'note_on',  note: n.midi });
+          events.push({ time: n.time + n.duration, type: 'note_off', note: n.midi });
+        });
+      });
+      events.sort((a,b) => a.time - b.time);
+
+      let currentNotes = new Set();
+      let evIdx = 0;
+      for (let s = 0; s < steps; s++) {
+        const t = s * stepSec;
+        while (evIdx < events.length && events[evIdx].time <= t) {
+          const e = events[evIdx++];
+          if (e.type === 'note_on')  currentNotes.add(e.note);
+          else if (e.type === 'note_off') currentNotes.delete(e.note);
+        }
+        timeline[s] = new Set(currentNotes);
+      }
+
+      // Générer le tableau binaire
+      const bytes = [];
+      for (let s = 0; s < steps; s++) {
+        let bitAcc = 0, count = 0;
+        for (let i = 0; i < NOTE_COUNT; i++) {
+          if (timeline[s].has(NOTES[i])) bitAcc |= 1 << (7 - (i % 8));
+          count++;
+          if (count === 8 || i === NOTE_COUNT -1) {
+            bytes.push(bitAcc);
+            bitAcc = 0;
+            count = 0;
+          }
+        }
+      }
+      binaryData = new Uint8Array(bytes);
+
+      log(`Fichier .dumb généré : ${binaryData.length} octets`);
+      downloadBtn.disabled = false;
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!binaryData) return;
+      const blob = new Blob([binaryData], {type: 'application/octet-stream'});
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = 'output.dumb';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
